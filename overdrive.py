@@ -27,6 +27,9 @@ class Overdrive:
         self._locationChangeCallbackFunc = None
         self._pongCallbackFunc = None
         self._transitionCallbackFunc = None
+        self._delocalizedCallbackFunc = None
+        self._offsetFromRoadCenterCallbackFunc = None
+
         while True:
             try:
                 self.connect()
@@ -233,15 +236,28 @@ class Overdrive:
         """
         self._transitionCallbackFunc = func
 
-    def _transitionCallback(self):
+    def _transitionCallback(self,piece,piecePrev,offset,direction):
         """Piece transition callback wrapper.
         
         Parameters:
         addr -- MAC address of car
         """
         if self._transitionCallbackFunc is not None:
-            self._transitionCallbackFunc(self.addr)
+            self._transitionCallbackFunc(self.addr,piece,piecePrev,offset,direction)
 
+    def setDelocalizedCallback(self, func):
+        self._delocalizedCallbackFunc = func
+
+    def _delocalizedCallback(self):
+        if self._delocalizedCallbackFunc is not None:
+            self._delocalizedCallbackFunc()
+
+    def setOffsetFromRoadCenterCallback(self, func):
+        self._offsetFromRoadCenterCallbackFunc = func
+
+    def _offsetFromRoadCenterCallback(self,offset):
+        if self._offsetFromRoadCenterCallbackFunc is not None:
+            self._offsetFromRoadCenterCallbackFunc(offset)
 
 class OverdriveDelegate(btle.DefaultDelegate):
     """Notification delegate object for Bluepy, for internal use only."""
@@ -266,10 +282,23 @@ class OverdriveDelegate(btle.DefaultDelegate):
             if commandId == 0x29:
                 # Transition notification
                 piece, piecePrev, offset, direction = struct.unpack_from("<BBfB", data, 2)
-                threading.Thread(target=self.overdrive._transitionCallback).start()
+                #threading.Thread(target=self.overdrive._transitionCallback).start()
+                threading.Thread(target=self.overdrive._transitionCallback, args=(piece,piecePrev,offset,direction)).start() 
             elif commandId == 0x17:
                 # Pong
                 threading.Thread(target=self.overdrive._pongCallback).start()
+            elif commandId == 0x2a:
+                #Location intersection update
+                pass
+            elif commandId == 0x2b:
+                #vehicle delocatized.
+                threading.Thread(target=self.overdrive._delocalizedCallback).start() 
+                pass
+            elif commandId == 0x2d:
+                #Offset from road center update
+                #offset = struct.unpack_from("<I",2) 
+                #threading.Thread(target=self.overdrive._offsetFromRoadCenterCallback, args=(offset)).start()
+                pass
 
     def setHandle(self, handle):
         self.handle = handle
